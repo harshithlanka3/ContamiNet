@@ -12,7 +12,7 @@ Respond ONLY in JSON with this exact structure: {"contaminated": true or false, 
 
     try:
         response = ollama.chat(
-            model='qwen2.5vl:3b',
+            model='moondream',
             messages=[{
                 'role': 'user',
                 'content': prompt,
