@@ -31,7 +31,7 @@ needed—do not truncate image_description or reason.
 
     try:
         response = ollama.chat(
-            model="qwen2.5vl:3b",
+            model="moondream",
             messages=[
                 {
                     "role": "user",
