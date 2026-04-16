@@ -8,23 +8,36 @@ model = YOLO('yolov8s-world.pt')
 
 # 2. Define the custom open-vocabulary classes
 classes = [
-    "clear plastic container", 
-    "transparent plastic box", 
-    "empty plastic tray", 
-    "plastic packaging",
-    "plastic berry container" 
+    # Clear/Transparent focus
+    "clear plastic container", "transparent plastic bottle", "empty clear plastic box", 
+    "clear plastic clamshell", "transparent plastic cup", "clear plastic lid",
+    
+    # Opaque/Colored focus
+    "opaque plastic bottle", "white plastic jug", "black plastic tray", 
+    "colored plastic tub", "opaque detergent bottle",
+    
+    # Specific shapes/states
+    "plastic water bottle", "plastic takeout container", "plastic berry container", 
+    "crushed plastic bottle", "plastic yogurt tub", "open yogurt tub",
+    "dirty plastic container on its side",
+    "plastic container on its side",
+    "plastic cup looking inside",
+    
+    # Bags/Films
+    "plastic grocery bag", "clear plastic bag", "crumpled plastic wrap"
 ]
+
 model.set_classes(classes)
 
 # 3. Load the image and run detection
-image_path = "24oz_blueberry_72.jpg"  # Replace with your actual image path
+image_path = "test_images/empty-yoghurt-pot-B8K673.jpg"  # Replace with your actual image path
 original_img = cv2.imread(image_path)
 
 if original_img is None:
     raise FileNotFoundError(f"Could not load image at {image_path}")
 
 # Run inference (conf=0.15 is slightly lowered to catch more edge cases)
-results = model.predict(image_path, conf=0.05)
+results = model.predict(image_path, conf=0.15)
 
 # 4. Process bounding boxes, apply padding, and crop
 padding_percent = 0.15  # 15% padding to capture edges/lids

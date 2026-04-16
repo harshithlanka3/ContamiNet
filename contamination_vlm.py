@@ -9,7 +9,7 @@ def check_contamination(image_path):
     """
     prompt = """Analyze this plastic cup/container image for recycling contamination.
 
-Step 1 (image description): Describe what is visibly inside the cup/container interior. Include:
+Step 1 (image description): Describe what is visibly inside the cup/container/plastic container/bag/plastic waste interior. Include:
 - whether there is any pooled liquid at the bottom
 - whether a meniscus/clear liquid line is visible
 - the liquid color (if any) and whether there are bubbles/film on the walls/bottom
@@ -17,7 +17,7 @@ Step 1 (image description): Describe what is visibly inside the cup/container in
 Step 2 (contamination decision): Decide if the plastic is contaminated based ONLY on visible residue inside or on it.
 
 IMPORTANT LIQUID RULE (to reduce missed detections):
-- If you can see any liquid inside the cup (even if it is clear, dark, translucent, or appears as a meniscus/pooled layer), count that as visible residue.
+- If you can see any liquid inside the plastic waste (even if it is clear, dark, translucent, or appears as a meniscus/pooled layer), count that as visible residue.
 - Also count any film/stains/residue on the interior walls or bottom (food, oil, organic stains).
 - Ignore reflections/lighting artifacts on the outside and ignore physical damage/crushing.
 
@@ -53,7 +53,7 @@ needed—do not truncate image_description or reason.
 
 
 if __name__ == "__main__":
-    image_file = "d26mbvplp2p61.jpg"
+    image_file = "test_images/24oz_blueberry_72.jpg"
     result = check_contamination(image_file)
     if isinstance(result, dict):
         print(json.dumps(result, indent=2, ensure_ascii=False))
