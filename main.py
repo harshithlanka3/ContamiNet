@@ -77,10 +77,12 @@ Step 1 (image description): Describe what is visibly inside the cup/container/pl
 
 Step 2 (contamination decision): Decide if the plastic is contaminated based ONLY on visible residue inside or on it.
 
-IMPORTANT LIQUID RULE (to reduce missed detections):
-- If you can see any liquid inside the plastic waste (even if it is clear, dark, translucent, or appears as a meniscus/pooled layer), count that as visible residue.
-- Also count any film/stains/residue on the interior walls or bottom (food, oil, organic stains).
-- Ignore reflections/lighting artifacts on the outside and ignore physical damage/crushing.
+WATER vs OTHER LIQUIDS / RESIDUE (read carefully):
+- **Slight clear water only is OK (not contaminated):** a few tiny clear water droplets, light condensation, or minimal rinse water on the walls/bottom with **no** pooled layer, **no** continuous meniscus, **no** colored/tinted liquid, and **no** oily/sticky/food film. Trace water from a drink bottle that looks essentially empty with only minor cling is acceptable.
+- **Still contaminated:** any **pooled** liquid, a **visible liquid line/meniscus**, liquid that is **tinted/colored** (not plain clear water), **bubbles/suds**, **oil/grease**, **food or drink residue** (milk, juice, soda film, stains), or **non-water** liquids. Hazy or substantial water film that looks like more than trace droplets counts as residue.
+- If you are unsure whether moisture is plain trace water vs drink/product residue, favor **contaminated** when there is color, film, or substantial wetting beyond a few clear droplets.
+
+Ignore reflections/lighting artifacts on the outside and ignore physical damage/crushing.
 
 Respond ONLY in JSON with this exact structure (valid JSON).
 {
