@@ -33,7 +33,7 @@ source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-`requirements.txt` includes `fastapi[standard]`, `ollama`, **`google-genai`** (Gemini; replaces deprecated `google-generativeai`), `ultralytics`, `opencv-python-headless`, and `numpy`.
+`requirements.txt` includes `fastapi[standard]`, `ollama`, **`google-genai`** (Gemini; replaces deprecated `google-generativeai`), `ultralytics`, `opencv-python-headless`, `numpy`, **`streamlit`**, and **`requests`** (for the optional UI).
 
 ## Run the server
 
@@ -66,6 +66,18 @@ Equivalent with Uvicorn directly:
 ```bash
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
+
+## Streamlit UI
+
+With the API running (default `http://127.0.0.1:8000`), start the browser UI from the repo root:
+
+```bash
+streamlit run streamlit_app.py
+```
+
+Optional: set **`CONTAMINET_API_URL`** in `.env` (or the sidebar field) if the API is not on localhost.
+
+The app uploads an image to **`POST /analyze`**, shows **contaminated / not**, **image description**, **reason**, provider and crop metadata, the **original image** with **red** = YOLO tight box and **teal** = padded crop sent to the VLM, and a **crop preview** when coordinates are returned.
 
 ## How the API works
 
