@@ -1,2 +1,5 @@
 fastapi[standard]
 ollama
+ultralytics
+opencv-python-headless
+numpy
