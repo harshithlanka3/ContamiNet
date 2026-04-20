@@ -68,6 +68,9 @@ If the model returns non-JSON text, the handler may return `error` and `raw_cont
 | `YOLO_WORLD_WEIGHTS` | `yolov8s-world.pt` | Weights path or model name for Ultralytics |
 | `YOLO_WORLD_CONF` | `0.05` | Minimum confidence for detections |
 | `YOLO_CROP_PADDING` | `0.15` | Fractional pad applied to each side of the box before cropping |
+| `CONTAMINET_DEBUG` | unset | Set to `1` / `true` / `yes` to log **per-request phase timings** (upload read → YOLO thread steps → Ollama). Helps find stalls (e.g. long gap before `model.predict returned` vs before `Ollama chat returned`). |
+
+**Startup logs** (always on, `INFO`): time to load `YOLO()` and `set_classes` is printed once when the app boots—first run may spend a long time **downloading weights**.
 
 Ollama must be reachable at **`http://127.0.0.1:11434`** unless you change `AsyncClient(host=...)` in `main.py`.
 
