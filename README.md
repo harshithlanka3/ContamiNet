@@ -77,7 +77,7 @@ streamlit run streamlit_app.py
 
 Optional: set **`CONTAMINET_API_URL`** in `.env` (or the sidebar field) if the API is not on localhost.
 
-The app uploads an image to **`POST /analyze`**, shows **contaminated / not**, **image description**, **reason**, provider and crop metadata, the **original image** with **red** = YOLO tight box and **teal** = padded crop sent to the VLM, and a **crop preview** when coordinates are returned.
+The app uploads an image to **`POST /analyze`**, shows **contaminated / not**, **image description**, **reason**, **`cleaning_instructions`** (how to make the item cleanable when needed), **`sorting_guidance`** (recycle / trash / after-cleaning, with a local-rules caveat), provider and crop metadata, the **original image** with **red** = YOLO tight box and **teal** = padded crop sent to the VLM, and a **crop preview** when coordinates are returned.
 
 ## How the API works
 
@@ -91,6 +91,7 @@ The app uploads an image to **`POST /analyze`**, shows **contaminated / not**, *
    - **Ollama**: `AsyncClient.chat(..., format="json")` with `OLLAMA_VLM_MODEL` (default `qwen2.5vl:3b`).
    - **Google**: Gemini `generate_content` with `response_mime_type="application/json"` and `GEMINI_MODEL` (default **`gemini-2.5-flash-lite`**). The image is sent with MIME type `image/jpeg` for YOLO crops, or the upload’s `Content-Type` when the full image is used.
 8. The JSON response includes the VLM fields when parsing succeeds, plus pipeline metadata:
+   - Core VLM keys: **`image_description`**, **`contaminated`**, **`reason`**, **`cleaning_instructions`** (how to make the item cleanable when contaminated, or that none is needed), **`sorting_guidance`** (recycle / trash / after-cleaning; general guidance—local rules vary).
    - **`vlm_provider`**: `"ollama"` or `"google"`.
    - **`crop_source`**: `"yolo_best_detection"` if a crop was sent to the VLM, or `"full_image"` if the whole upload was used.
    - **`yolo`**: when a best box was chosen, an object with `label`, `confidence`, `class_id`, and box coordinates (`bbox_xyxy`, `crop_xyxy`); otherwise `null` (or includes a `note` when a box existed but cropping failed).
@@ -122,7 +123,7 @@ In **Ollama** mode, Ollama must be reachable at **`OLLAMA_HOST`**. In **Google**
 |------|--------|
 | Content-Type | `multipart/form-data` |
 | Field name | `file` (image file) |
-| Success body | JSON object: VLM fields plus `vlm_provider`, `crop_source`, and `yolo` (see above) |
+| Success body | JSON object: VLM fields (`image_description`, `contaminated`, `reason`, `cleaning_instructions`, `sorting_guidance`) plus `vlm_provider`, `crop_source`, and `yolo` (see above) |
 | 400 | Not an image, undecodable image, or bad input (`detail` message) |
 | 429 | Gemini rate limit or quota exceeded (`detail` includes retry hints) |
 | 500 | VLM provider error or unexpected server error (`detail` message) |

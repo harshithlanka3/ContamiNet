@@ -69,11 +69,17 @@ Step 2 (contamination decision): Set **contaminated** using the rules below. Bas
 
 Ignore reflections/lighting artifacts on the outside and ignore physical damage/crushing.
 
+Step 3 (action guidance for the person sorting or holding the item):
+- **cleaning_instructions:** Practical steps to make the item **clean enough for typical recycling** when it is **contaminated** (e.g. empty, rinse with water, wipe residue, let dry). If it is **not** contaminated, say clearly that **no cleaning is required** (or only optional habits like a quick rinse). Keep steps short and safe (no harsh chemicals unless obviously appropriate). If cleaning is unlikely to help (e.g. heavy grease), say so honestly.
+- **sorting_guidance:** What to do with the item **given what you see**—e.g. **recycle now** in a plastics/container stream, **recycle only after** the cleaning steps, **do not recycle** (trash / landfill / organics if food-heavy), or **special program** (e.g. bottle deposit) when relevant. Use **general** wording; local rules vary, so avoid claiming a specific city ordinance—phrase as prudent recommendations.
+
 Respond ONLY in JSON with this exact structure (valid JSON).
 {
   "image_description": "complete description of what you see inside/on the container",
   "contaminated": true or false,
-  "reason": "complete explanation tied to visible evidence"
+  "reason": "complete explanation tied to visible evidence",
+  "cleaning_instructions": "what to do to make it cleanable, or that none is needed",
+  "sorting_guidance": "recycle vs trash vs after-cleaning; which stream if applicable; brief caveat that local rules vary"
 }"""
 
 

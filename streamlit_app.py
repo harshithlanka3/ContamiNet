@@ -111,6 +111,8 @@ if st.button("Analyze", type="primary", disabled=uploaded is None):
     contaminated = data.get("contaminated")
     desc = data.get("image_description", "")
     reason = data.get("reason", "")
+    cleaning = data.get("cleaning_instructions", "")
+    sorting = data.get("sorting_guidance", "")
     crop_source = data.get("crop_source", "")
     yolo = data.get("yolo")
     provider = data.get("vlm_provider", "")
@@ -134,6 +136,13 @@ if st.button("Analyze", type="primary", disabled=uploaded is None):
 
     st.subheader("Reasoning")
     st.write(reason or "—")
+
+    st.subheader("Cleaning instructions")
+    st.write(cleaning or "—")
+
+    st.subheader("Sorting & disposal guidance")
+    st.caption("General guidance only—always follow your local recycling program rules.")
+    st.write(sorting or "—")
 
     try:
         img = Image.open(io.BytesIO(raw))
