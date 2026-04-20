@@ -3,6 +3,10 @@ import json
 import logging
 import os
 import time
+
+from dotenv import load_dotenv
+
+load_dotenv()
 import uuid
 from contextlib import asynccontextmanager
 from typing import Any
