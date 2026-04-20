@@ -63,6 +63,7 @@ YOLO_CLASSES = [
     "plastic container",
     "liquid in plastic container",
     "plastic water bottle",
+    "plastic bottle",
     "plastic film",
     "plastic bag",
     "",
@@ -74,13 +75,22 @@ Step 1 (image description): Describe what is visibly inside the cup/container/pl
 - whether there is any pooled liquid at the bottom
 - whether a meniscus/clear liquid line is visible
 - the liquid color (if any) and whether there are bubbles/film on the walls/bottom
+- explicitly note if the ONLY moisture you see is small **clear** beads/droplets or light **condensation** (no tint, no pool, no film)
 
-Step 2 (contamination decision): Decide if the plastic is contaminated based ONLY on visible residue inside or on it.
+Step 2 (contamination decision): Set **contaminated** using the rules below. Base it ONLY on the interior/on-container evidence you described.
 
-WATER vs OTHER LIQUIDS / RESIDUE (read carefully):
-- **Slight clear water only is OK (not contaminated):** a few tiny clear water droplets, light condensation, or minimal rinse water on the walls/bottom with **no** pooled layer, **no** continuous meniscus, **no** colored/tinted liquid, and **no** oily/sticky/food film. Trace water from a drink bottle that looks essentially empty with only minor cling is acceptable.
-- **Still contaminated:** any **pooled** liquid, a **visible liquid line/meniscus**, liquid that is **tinted/colored** (not plain clear water), **bubbles/suds**, **oil/grease**, **food or drink residue** (milk, juice, soda film, stains), or **non-water** liquids. Hazy or substantial water film that looks like more than trace droplets counts as residue.
-- If you are unsure whether moisture is plain trace water vs drink/product residue, favor **contaminated** when there is color, film, or substantial wetting beyond a few clear droplets.
+**ACCEPTABLE (set contaminated to false):**
+- **Trace clear water only:** scattered **tiny clear** droplets clinging to walls/bottom, and/or **light condensation**, with **NO** pooled liquid, **NO** continuous meniscus/liquid line, **NO** color or cloudiness in the liquid, **NO** oily sheen, **NO** food/drink film, **NO** suds/bubbles from soap or beverage.
+- A water bottle or cup that is **essentially empty** with only this kind of cling moisture is **NOT** contaminated for sorting purposes.
+
+**NOT acceptable (set contaminated to true):**
+- Any **pooled** layer, **meniscus**, or **connected wet patch** that acts like a liquid surface (even if clear).
+- **Tinted, cloudy, or colored** liquid or film; **bubbles/suds**; **oil/grease**; **milk/juice/soda/food** residue or stains; **slime** or **sticky** film.
+- A **continuous hazy or frosted wet film** over a large area (not the same as a few separate tiny droplets).
+
+**Critical instruction (reduces false positives on water bottles):**
+- **Do NOT set contaminated=true only because you see small clear water droplets or condensation.** If your description lists **only** trace clear water / condensation and none of the “NOT acceptable” items above, you **must** set **contaminated** to **false** and say so in **reason**.
+- If something might be water vs sugary drink residue: if it is **clear, not sticky-looking, and not forming a pool or film**, treat it as acceptable trace water.
 
 Ignore reflections/lighting artifacts on the outside and ignore physical damage/crushing.
 
