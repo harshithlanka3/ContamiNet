@@ -2,14 +2,12 @@ import asyncio
 import json
 import logging
 import os
-import time
+from contextlib import asynccontextmanager
+from typing import Any
 
 from dotenv import load_dotenv
 
 load_dotenv()
-import uuid
-from contextlib import asynccontextmanager
-from typing import Any
 
 import cv2
 import numpy as np
@@ -25,29 +23,6 @@ from vlm_providers import (
 )
 
 log = logging.getLogger(__name__)
-
-
-def _debug_timing_enabled() -> bool:
-    return os.environ.get("CONTAMINET_DEBUG", "").lower() in ("1", "true", "yes")
-
-
-def _phase(req_id: str, label: str, t_prev: float | None) -> float:
-    """Log wall-clock step timing when CONTAMINET_DEBUG is set; always return monotonic time."""
-    now = time.monotonic()
-    if not _debug_timing_enabled():
-        return now
-    if t_prev is None:
-        log.info("contaminet [%s] %s (t=%.3f)", req_id, label, now)
-    else:
-        log.info(
-            "contaminet [%s] %s (dt=%.3fs, t=%.3f)",
-            req_id,
-            label,
-            now - t_prev,
-            now,
-        )
-    return now
-
 
 YOLO_WEIGHTS = os.environ.get("YOLO_WORLD_WEIGHTS", "yolov8s-world.pt")
 YOLO_CONF = float(os.environ.get("YOLO_WORLD_CONF", "0.05"))
@@ -127,15 +102,12 @@ def _encode_jpeg_rgb(image_rgb: NDArray[np.uint8], quality: int = 95) -> bytes:
 def select_vlm_image_bytes(
     image_bytes: bytes,
     model: YOLO,
-    req_id: str = "",
     upload_content_type: str | None = None,
 ) -> tuple[bytes, dict[str, Any]]:
     """
     Run YOLO-World, take the highest-confidence box, apply padding, crop, and JPEG-encode.
     If no detection or crop is invalid, return original bytes for the VLM.
     """
-    t = _phase(req_id, "yolo_worker: enter select_vlm_image_bytes", None)
-
     meta: dict[str, Any] = {
         "crop_source": "full_image",
         "yolo": None,
@@ -143,17 +115,9 @@ def select_vlm_image_bytes(
 
     bgr = _decode_bgr(image_bytes)
     image_rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
-    t = _phase(req_id, "yolo_worker: decode + bgr->rgb done", t)
     img_h, img_w = image_rgb.shape[:2]
-    t = _phase(
-        req_id,
-        f"yolo_worker: calling model.predict (h={img_h} w={img_w} conf={YOLO_CONF})",
-        t,
-    )
 
     results = model.predict(image_rgb, conf=YOLO_CONF, verbose=False)
-
-    t = _phase(req_id, "yolo_worker: model.predict returned", t)
 
     best_box = None
     highest_conf = 0.0
@@ -167,7 +131,6 @@ def select_vlm_image_bytes(
                 best_box = box
 
     if best_box is None:
-        _phase(req_id, "yolo_worker: no box above conf -> full image for VLM", t)
         meta["vlm_mime"] = _vlm_mime_for_upload(upload_content_type)
         return image_bytes, meta
 
@@ -187,7 +150,6 @@ def select_vlm_image_bytes(
     px2, py2 = min(img_w, x2 + pad_x), min(img_h, y2 + pad_y)
 
     if px2 <= px1 or py2 <= py1:
-        _phase(req_id, "yolo_worker: invalid padded box -> full image for VLM", t)
         meta["vlm_mime"] = _vlm_mime_for_upload(upload_content_type)
         meta["yolo"] = {
             "label": label,
@@ -199,7 +161,6 @@ def select_vlm_image_bytes(
 
     crop_rgb = image_rgb[py1:py2, px1:px2]
     if crop_rgb.size == 0:
-        _phase(req_id, "yolo_worker: empty crop -> full image for VLM", t)
         meta["vlm_mime"] = _vlm_mime_for_upload(upload_content_type)
         meta["yolo"] = {
             "label": label,
@@ -209,13 +170,7 @@ def select_vlm_image_bytes(
         }
         return image_bytes, meta
 
-    t = _phase(req_id, "yolo_worker: encoding crop jpeg", t)
     crop_bytes = _encode_jpeg_rgb(crop_rgb)
-    _phase(
-        req_id,
-        f"yolo_worker: done crop label={label!r} conf={highest_conf:.3f} vlm_bytes={len(crop_bytes)}",
-        t,
-    )
     meta["crop_source"] = "yolo_best_detection"
     meta["vlm_mime"] = "image/jpeg"
     meta["yolo"] = {
@@ -230,21 +185,10 @@ def select_vlm_image_bytes(
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    t0 = time.monotonic()
     log.info("ContamiNet: loading YOLO-World (%s)…", YOLO_WEIGHTS)
     model = YOLO(YOLO_WEIGHTS)
-    log.info(
-        "ContamiNet: YOLO() loaded in %.2fs; calling set_classes…",
-        time.monotonic() - t0,
-    )
-    t1 = time.monotonic()
     model.set_classes(YOLO_CLASSES)
-    log.info(
-        "ContamiNet: YOLO-World ready (set_classes %.2fs, total %.2fs). "
-        "Set CONTAMINET_DEBUG=1 for per-request phase logs.",
-        time.monotonic() - t1,
-        time.monotonic() - t0,
-    )
+    log.info("ContamiNet: YOLO-World ready")
     app.state.yolo = model
 
     provider = parse_vlm_provider()
@@ -284,36 +228,19 @@ async def check_contamination(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail="File provided is not an image.")
 
     try:
-        req_id = uuid.uuid4().hex[:12]
-        t = time.monotonic()
-        t = _phase(req_id, "analyze: request started", None)
-
         image_bytes = await file.read()
-        t = _phase(req_id, f"analyze: read upload ({len(image_bytes)} bytes)", t)
 
         model: YOLO = app.state.yolo
 
-        t = _phase(req_id, "analyze: scheduling YOLO in thread pool", t)
         vlm_bytes, yolo_meta = await asyncio.to_thread(
             select_vlm_image_bytes,
             image_bytes,
             model,
-            req_id,
             file.content_type,
-        )
-        t = _phase(
-            req_id,
-            f"analyze: YOLO thread done crop_source={yolo_meta['crop_source']} vlm_input_bytes={len(vlm_bytes)}",
-            t,
         )
 
         provider = app.state.vlm_provider
         vlm_mime = yolo_meta.get("vlm_mime", "image/jpeg")
-        t = _phase(
-            req_id,
-            f"analyze: calling VLM ({provider}, mime={vlm_mime})…",
-            t,
-        )
         content = await vlm_generate_json_text(
             provider,
             prompt=CONTAMINATION_PROMPT,
@@ -323,7 +250,6 @@ async def check_contamination(file: UploadFile = File(...)):
             ollama_model=app.state.ollama_vlm_model,
             gemini_model=app.state.gemini_model,
         )
-        t = _phase(req_id, "analyze: VLM returned", t)
 
         try:
             payload = json.loads(content)
@@ -342,7 +268,6 @@ async def check_contamination(file: UploadFile = File(...)):
             payload["crop_source"] = yolo_meta["crop_source"]
             payload["yolo"] = yolo_meta["yolo"]
 
-        _phase(req_id, "analyze: response ready", t)
         return payload
 
     except ValueError as e:

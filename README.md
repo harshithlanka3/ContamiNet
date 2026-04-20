@@ -97,9 +97,8 @@ If the model returns non-JSON text, the handler may return `error` and `raw_cont
 | `YOLO_WORLD_WEIGHTS` | `yolov8s-world.pt` | Weights path or model name for Ultralytics |
 | `YOLO_WORLD_CONF` | `0.05` | Minimum confidence for detections |
 | `YOLO_CROP_PADDING` | `0.15` | Fractional pad applied to each side of the box before cropping |
-| `CONTAMINET_DEBUG` | unset | Set to `1` / `true` / `yes` to log **per-request phase timings** (upload read → YOLO → VLM). Helps find stalls (e.g. long gap before `model.predict returned` vs before `VLM returned`). |
 
-**Startup logs** (always on, `INFO`): time to load `YOLO()` and `set_classes`, plus which **VLM provider** is active. First boot may spend a long time **downloading YOLO weights**.
+**Startup logs** (`INFO`): YOLO load start/finish and which **VLM provider** is active. First boot may take a while while **YOLO weights** download.
 
 In **Ollama** mode, Ollama must be reachable at **`OLLAMA_HOST`**. In **Google** mode, outbound HTTPS to Google’s API is required; Ollama does not need to be running.
 
