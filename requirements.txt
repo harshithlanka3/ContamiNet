@@ -1,7 +1,7 @@
 fastapi[standard]
 python-dotenv
 ollama
-google-generativeai
+google-genai
 ultralytics
 opencv-python-headless
 numpy

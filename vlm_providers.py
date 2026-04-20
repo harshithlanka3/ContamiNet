@@ -1,12 +1,15 @@
-"""VLM backends: local Ollama vs Google AI Studio (Gemini)."""
+"""VLM backends: local Ollama vs Google AI Studio (Gemini via google-genai SDK)."""
 
 from __future__ import annotations
 
 import asyncio
 import os
-from typing import Literal
+from typing import Any, Literal
 
 Provider = Literal["ollama", "google"]
+
+# Set in init_google_backend() when CONTAMINET_VLM_PROVIDER=google
+_google_genai_client: Any = None
 
 
 class GeminiQuotaOrRateLimit(Exception):
@@ -37,9 +40,19 @@ def google_api_key() -> str:
 
 def init_google_backend() -> None:
     """Call once at process startup when using the Google provider."""
-    import google.generativeai as genai
+    global _google_genai_client
+    from google import genai
 
-    genai.configure(api_key=google_api_key())
+    _google_genai_client = genai.Client(api_key=google_api_key())
+
+
+def _gemini_client() -> Any:
+    global _google_genai_client
+    if _google_genai_client is None:
+        from google import genai
+
+        _google_genai_client = genai.Client(api_key=google_api_key())
+    return _google_genai_client
 
 
 async def vlm_generate_json_text(
@@ -76,24 +89,25 @@ async def vlm_generate_json_text(
         raise ValueError(f"Unknown VLM provider: {provider!r}")
 
     def _run_google() -> str:
-        import google.generativeai as genai
-        from google.api_core import exceptions as gexc
+        from google.genai import errors as genai_errors
+        from google.genai import types
 
-        model = genai.GenerativeModel(
-            gemini_model,
-            generation_config=genai.GenerationConfig(
-                response_mime_type="application/json",
-            ),
-        )
+        client = _gemini_client()
         try:
-            response = model.generate_content(
-                [
-                    prompt,
-                    {"mime_type": image_mime, "data": image_bytes},
+            response = client.models.generate_content(
+                model=gemini_model,
+                contents=[
+                    types.Part.from_text(text=prompt),
+                    types.Part.from_bytes(data=image_bytes, mime_type=image_mime),
                 ],
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                ),
             )
-        except gexc.ResourceExhausted as e:
-            raise GeminiQuotaOrRateLimit(str(e)) from e
+        except genai_errors.APIError as e:
+            if getattr(e, "code", None) == 429:
+                raise GeminiQuotaOrRateLimit(str(e)) from e
+            raise
         except Exception as e:
             msg = str(e)
             if "429" in msg or (
@@ -101,9 +115,7 @@ async def vlm_generate_json_text(
             ):
                 raise GeminiQuotaOrRateLimit(msg) from e
             raise
-        if not response.candidates:
-            fb = getattr(response, "prompt_feedback", None)
-            raise RuntimeError(f"Gemini returned no candidates (prompt_feedback={fb!r})")
+
         text = (response.text or "").strip()
         if not text:
             raise RuntimeError("Gemini returned empty text")

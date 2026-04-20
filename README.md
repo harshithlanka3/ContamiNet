@@ -33,7 +33,7 @@ source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-`requirements.txt` includes `fastapi[standard]`, `ollama`, `google-generativeai`, `ultralytics`, `opencv-python-headless`, and `numpy`.
+`requirements.txt` includes `fastapi[standard]`, `ollama`, **`google-genai`** (Gemini; replaces deprecated `google-generativeai`), `ultralytics`, `opencv-python-headless`, and `numpy`.
 
 ## Run the server
 
