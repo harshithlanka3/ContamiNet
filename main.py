@@ -11,8 +11,9 @@ import cv2
 import numpy as np
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from numpy.typing import NDArray
-from ollama import AsyncClient
 from ultralytics import YOLO
+
+from vlm_providers import init_google_backend, parse_vlm_provider, vlm_generate_json_text
 
 log = logging.getLogger(__name__)
 
@@ -80,6 +81,12 @@ Respond ONLY in JSON with this exact structure (valid JSON).
 }"""
 
 
+def _vlm_mime_for_upload(upload_content_type: str | None) -> str:
+    if upload_content_type and upload_content_type.startswith("image/"):
+        return upload_content_type
+    return "image/jpeg"
+
+
 def _decode_bgr(image_bytes: bytes) -> NDArray[np.uint8]:
     arr = np.frombuffer(image_bytes, dtype=np.uint8)
     bgr = cv2.imdecode(arr, cv2.IMREAD_COLOR)
@@ -97,7 +104,10 @@ def _encode_jpeg_rgb(image_rgb: NDArray[np.uint8], quality: int = 95) -> bytes:
 
 
 def select_vlm_image_bytes(
-    image_bytes: bytes, model: YOLO, req_id: str = ""
+    image_bytes: bytes,
+    model: YOLO,
+    req_id: str = "",
+    upload_content_type: str | None = None,
 ) -> tuple[bytes, dict[str, Any]]:
     """
     Run YOLO-World, take the highest-confidence box, apply padding, crop, and JPEG-encode.
@@ -137,6 +147,7 @@ def select_vlm_image_bytes(
 
     if best_box is None:
         _phase(req_id, "yolo_worker: no box above conf -> full image for VLM", t)
+        meta["vlm_mime"] = _vlm_mime_for_upload(upload_content_type)
         return image_bytes, meta
 
     x1, y1, x2, y2 = map(int, best_box.xyxy[0].tolist())
@@ -156,6 +167,7 @@ def select_vlm_image_bytes(
 
     if px2 <= px1 or py2 <= py1:
         _phase(req_id, "yolo_worker: invalid padded box -> full image for VLM", t)
+        meta["vlm_mime"] = _vlm_mime_for_upload(upload_content_type)
         meta["yolo"] = {
             "label": label,
             "confidence": highest_conf,
@@ -167,6 +179,7 @@ def select_vlm_image_bytes(
     crop_rgb = image_rgb[py1:py2, px1:px2]
     if crop_rgb.size == 0:
         _phase(req_id, "yolo_worker: empty crop -> full image for VLM", t)
+        meta["vlm_mime"] = _vlm_mime_for_upload(upload_content_type)
         meta["yolo"] = {
             "label": label,
             "confidence": highest_conf,
@@ -183,6 +196,7 @@ def select_vlm_image_bytes(
         t,
     )
     meta["crop_source"] = "yolo_best_detection"
+    meta["vlm_mime"] = "image/jpeg"
     meta["yolo"] = {
         "label": label,
         "confidence": highest_conf,
@@ -211,6 +225,27 @@ async def lifespan(app: FastAPI):
         time.monotonic() - t0,
     )
     app.state.yolo = model
+
+    provider = parse_vlm_provider()
+    app.state.vlm_provider = provider
+    app.state.gemini_model = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash")
+    app.state.ollama_host = os.environ.get("OLLAMA_HOST", "http://127.0.0.1:11434")
+    app.state.ollama_vlm_model = os.environ.get("OLLAMA_VLM_MODEL", "qwen2.5vl:3b")
+
+    log.info("ContamiNet: VLM provider=%s", provider)
+    if provider == "google":
+        init_google_backend()
+        log.info(
+            "ContamiNet: Google Gemini model=%s (API key from GEMINI_API_KEY or GOOGLE_API_KEY)",
+            app.state.gemini_model,
+        )
+    else:
+        log.info(
+            "ContamiNet: Ollama host=%s model=%s",
+            app.state.ollama_host,
+            app.state.ollama_vlm_model,
+        )
+
     yield
 
 
@@ -238,7 +273,11 @@ async def check_contamination(file: UploadFile = File(...)):
 
         t = _phase(req_id, "analyze: scheduling YOLO in thread pool", t)
         vlm_bytes, yolo_meta = await asyncio.to_thread(
-            select_vlm_image_bytes, image_bytes, model, req_id
+            select_vlm_image_bytes,
+            image_bytes,
+            model,
+            req_id,
+            file.content_type,
         )
         t = _phase(
             req_id,
@@ -246,23 +285,23 @@ async def check_contamination(file: UploadFile = File(...)):
             t,
         )
 
-        client = AsyncClient(host="http://127.0.0.1:11434")
-
-        t = _phase(req_id, "analyze: calling Ollama chat (qwen2.5vl:3b)…", t)
-        response = await client.chat(
-            model="qwen2.5vl:3b",
-            messages=[
-                {
-                    "role": "user",
-                    "content": CONTAMINATION_PROMPT,
-                    "images": [vlm_bytes],
-                }
-            ],
-            format="json",
+        provider = app.state.vlm_provider
+        vlm_mime = yolo_meta.get("vlm_mime", "image/jpeg")
+        t = _phase(
+            req_id,
+            f"analyze: calling VLM ({provider}, mime={vlm_mime})…",
+            t,
         )
-        t = _phase(req_id, "analyze: Ollama chat returned", t)
-
-        content = response["message"]["content"]
+        content = await vlm_generate_json_text(
+            provider,
+            prompt=CONTAMINATION_PROMPT,
+            image_bytes=vlm_bytes,
+            image_mime=vlm_mime,
+            ollama_host=app.state.ollama_host,
+            ollama_model=app.state.ollama_vlm_model,
+            gemini_model=app.state.gemini_model,
+        )
+        t = _phase(req_id, "analyze: VLM returned", t)
 
         try:
             payload = json.loads(content)
@@ -270,12 +309,14 @@ async def check_contamination(file: UploadFile = File(...)):
             payload = {
                 "error": "Model returned invalid JSON",
                 "raw_content": content,
+                "vlm_provider": provider,
                 "crop_source": yolo_meta["crop_source"],
                 "yolo": yolo_meta["yolo"],
             }
             return payload
 
         if isinstance(payload, dict):
+            payload["vlm_provider"] = provider
             payload["crop_source"] = yolo_meta["crop_source"]
             payload["yolo"] = yolo_meta["yolo"]
 

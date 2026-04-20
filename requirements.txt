@@ -1,5 +1,6 @@
 fastapi[standard]
 ollama
+google-generativeai
 ultralytics
 opencv-python-headless
 numpy
