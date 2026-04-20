@@ -17,7 +17,12 @@ from fastapi import FastAPI, File, HTTPException, UploadFile
 from numpy.typing import NDArray
 from ultralytics import YOLO
 
-from vlm_providers import init_google_backend, parse_vlm_provider, vlm_generate_json_text
+from vlm_providers import (
+    GeminiQuotaOrRateLimit,
+    init_google_backend,
+    parse_vlm_provider,
+    vlm_generate_json_text,
+)
 
 log = logging.getLogger(__name__)
 
@@ -232,7 +237,8 @@ async def lifespan(app: FastAPI):
 
     provider = parse_vlm_provider()
     app.state.vlm_provider = provider
-    app.state.gemini_model = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash")
+    # Default favors AI Studio free tier; 2.0-flash often shows 0 quota on free tier.
+    app.state.gemini_model = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash-lite")
     app.state.ollama_host = os.environ.get("OLLAMA_HOST", "http://127.0.0.1:11434")
     app.state.ollama_vlm_model = os.environ.get("OLLAMA_VLM_MODEL", "qwen2.5vl:3b")
 
@@ -329,5 +335,15 @@ async def check_contamination(file: UploadFile = File(...)):
 
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
+    except GeminiQuotaOrRateLimit as e:
+        raise HTTPException(
+            status_code=429,
+            detail=(
+                "Gemini rate limit or quota exceeded (common on the free tier). "
+                "Wait and retry, try GEMINI_MODEL=gemini-2.5-flash-lite or gemini-2.5-flash, "
+                "or enable billing for higher limits. Raw: "
+                + str(e)
+            ),
+        ) from e
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"VLM Error: {str(e)}") from e

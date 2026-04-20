@@ -9,6 +9,12 @@ from typing import Literal
 Provider = Literal["ollama", "google"]
 
 
+class GeminiQuotaOrRateLimit(Exception):
+    """Gemini API returned 429 or quota / rate-limit exhaustion."""
+
+    pass
+
+
 def parse_vlm_provider() -> Provider:
     raw = os.environ.get("CONTAMINET_VLM_PROVIDER", "ollama").strip().lower()
     if raw in ("ollama", "local"):
@@ -71,6 +77,7 @@ async def vlm_generate_json_text(
 
     def _run_google() -> str:
         import google.generativeai as genai
+        from google.api_core import exceptions as gexc
 
         model = genai.GenerativeModel(
             gemini_model,
@@ -78,12 +85,22 @@ async def vlm_generate_json_text(
                 response_mime_type="application/json",
             ),
         )
-        response = model.generate_content(
-            [
-                prompt,
-                {"mime_type": image_mime, "data": image_bytes},
-            ],
-        )
+        try:
+            response = model.generate_content(
+                [
+                    prompt,
+                    {"mime_type": image_mime, "data": image_bytes},
+                ],
+            )
+        except gexc.ResourceExhausted as e:
+            raise GeminiQuotaOrRateLimit(str(e)) from e
+        except Exception as e:
+            msg = str(e)
+            if "429" in msg or (
+                "quota" in msg.lower() and "exceed" in msg.lower()
+            ):
+                raise GeminiQuotaOrRateLimit(msg) from e
+            raise
         if not response.candidates:
             fb = getattr(response, "prompt_feedback", None)
             raise RuntimeError(f"Gemini returned no candidates (prompt_feedback={fb!r})")
