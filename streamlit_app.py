@@ -101,11 +101,59 @@ if st.button("Analyze", type="primary", disabled=uploaded is None):
             st.error(str(e))
             st.stop()
 
-    if "error" in data:
-        st.error(data.get("error", "Unknown error"))
-        if data.get("raw_content"):
-            st.code(data["raw_content"], language="text")
-        st.json(data)
+    no_plastic = isinstance(data, dict) and data.get("error") == "no plastic detected"
+
+    if isinstance(data, dict) and "error" in data:
+        if no_plastic:
+            st.warning(
+                "**No plastic detected.** The VLM did not identify plastic trash or a "
+                "plastic container in this image, so contamination assessment was skipped."
+            )
+            reason = data.get("reason", "")
+            if reason:
+                st.subheader("What the model saw")
+                st.write(reason)
+            crop_source = data.get("crop_source", "")
+            yolo = data.get("yolo")
+            provider = data.get("vlm_provider", "")
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                st.metric("VLM provider", provider or "—")
+            with c2:
+                st.metric("YOLO crop", crop_source.replace("_", " ") if crop_source else "—")
+            with c3:
+                st.metric("YOLO detection", "yes" if yolo else "no")
+
+            try:
+                img = Image.open(io.BytesIO(raw))
+            except Exception as e:
+                st.warning(f"Could not open image for preview: {e}")
+            else:
+                st.subheader("Uploaded image")
+                if yolo and yolo.get("bbox_xyxy") and yolo.get("crop_xyxy"):
+                    st.caption(
+                        "Red: YOLO box. Teal: region sent to the VLM. "
+                        "The API still returned no plastic after VLM review."
+                    )
+                    st.image(_annotate_detections(img, yolo), use_container_width=True)
+                elif yolo and (yolo.get("note") or yolo.get("label")):
+                    st.image(
+                        img,
+                        caption="Original (YOLO had a signal but no usable crop coordinates)",
+                        use_container_width=True,
+                    )
+                    st.info(f"YOLO: **{yolo.get('label', '?')}** — {yolo.get('note', '')}")
+                else:
+                    st.caption("Full image was sent to the VLM when no reliable crop was used.")
+                    st.image(img, use_container_width=True)
+
+            with st.expander("Raw API response"):
+                st.json(data)
+        else:
+            st.error(data.get("error", "Unknown error"))
+            if data.get("raw_content"):
+                st.code(data["raw_content"], language="text")
+            st.json(data)
         st.stop()
 
     contaminated = data.get("contaminated")

@@ -46,6 +46,10 @@ YOLO_CLASSES = [
 
 CONTAMINATION_PROMPT = """Analyze this plastic cup/container image for recycling contamination.
 
+Step 0 (plastic gate): First decide if there is any plastic trash/object/container in this image.
+- Set "plastic_detected" to true only if you can clearly identify a plastic item relevant for contamination assessment.
+- If no plastic item is visible, set "plastic_detected" to false and explain briefly in "reason". In this case, keep other fields short and neutral.
+
 Step 1 (image description): Describe what is visibly inside the cup/container/plastic container/bag/plastic waste interior. Include:
 - whether there is any pooled liquid at the bottom
 - whether a meniscus/clear liquid line is visible
@@ -75,6 +79,7 @@ Step 3 (action guidance for the person sorting or holding the item):
 
 Respond ONLY in JSON with this exact structure (valid JSON).
 {
+  "plastic_detected": true or false,
   "image_description": "complete description of what you see inside/on the container",
   "contaminated": true or false,
   "reason": "complete explanation tied to visible evidence",
@@ -270,6 +275,20 @@ async def check_contamination(file: UploadFile = File(...)):
             return payload
 
         if isinstance(payload, dict):
+            plastic_detected = payload.get("plastic_detected")
+            if plastic_detected is False:
+                payload = {
+                    "error": "no plastic detected",
+                    "reason": payload.get(
+                        "reason",
+                        "No plastic trash/object was identified in the image.",
+                    ),
+                    "vlm_provider": provider,
+                    "crop_source": yolo_meta["crop_source"],
+                    "yolo": yolo_meta["yolo"],
+                }
+                return payload
+
             payload["vlm_provider"] = provider
             payload["crop_source"] = yolo_meta["crop_source"]
             payload["yolo"] = yolo_meta["yolo"]
