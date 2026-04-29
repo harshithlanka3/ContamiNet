@@ -69,13 +69,21 @@ uvicorn main:app --reload --host 0.0.0.0 --port 8000
 
 ## Streamlit UI
 
-With the API running (default `http://127.0.0.1:8000`), start the browser UI from the repo root:
+Run in two terminals from the repo root.
+
+Terminal 1 (API):
+
+```bash
+fastapi run main.py
+```
+
+Terminal 2 (Streamlit):
 
 ```bash
 streamlit run streamlit_app.py
 ```
 
-Optional: set **`CONTAMINET_API_URL`** in `.env` (or the sidebar field) if the API is not on localhost.
+The UI defaults to `http://127.0.0.1:8000`; you can override it in the sidebar or with **`CONTAMINET_API_URL`** in `.env`.
 
 The app uploads an image to **`POST /analyze`**, shows **contaminated / not**, **image description**, **reason**, **`cleaning_instructions`** (how to make the item cleanable when needed), **`sorting_guidance`** (recycle / trash / after-cleaning, with a local-rules caveat), provider and crop metadata, the **original image** with **red** = YOLO tight box and **teal** = padded crop sent to the VLM, and a **crop preview** when coordinates are returned.
 
